@@ -1,0 +1,110 @@
+// simpleProgramRunner.cpp : This file contains the 'main' function. Program execution begins and ends there.
+//
+
+#include <chrono>
+#include <thread>
+#include <iostream>
+#include <Windows.h>
+#include <wininet.h>
+#include <vector>
+#include <algorithm>
+#include <cstring>
+#include <psapi.h>
+
+#pragma comment(  lib, "wininet.lib" )
+
+void myConnectChecker()
+{
+    int connectAttempt = 0; // Counter for the number of connection attempts
+    bool connected = false; // Boolean flag to indicate if the program is connected
+
+    while ( connectAttempt < 5 && !connected ) // Loop while we haven't reached the maximum number of attempts and the program is not connected
+    {
+        HINTERNET hInternet = InternetOpen( TEXT( "program" ), INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0 ); // Open an internet connection handle
+        if ( hInternet != NULL ) // If the connection handle was successfully created
+        {
+            InternetCloseHandle( hInternet ); // Close the connection handle
+            std::cout << "Program Started\n"; // Print a message indicating that the program is online
+            // std::system( "start C:\\startExampleVBSscript.vbs" ); // Start the VBScript file
+            connected = true; // Set the connected flag to true
+        }
+        else { std::cout << "Program Failed, Connection Error\n"; } // Print a message indicating that the program failed to connect
+
+        std::this_thread::sleep_for( std::chrono::seconds( 60 ) ); // Wait for 60 seconds before trying again
+        connectAttempt++; // Increment the attempt counter
+    }
+}
+
+std::vector<std::string> myProgramChecker() 
+{
+    std::vector<std::string> processes; // Vector to store the names of running processes
+    DWORD processIds[1024], bytesReturned; // Declare an array to store the process IDs
+    
+    // The array of process IDs is stored in "processIds" and the number of bytes returned is stored in "bytesReturned"
+    if ( EnumProcesses( processIds, sizeof( processIds ), &bytesReturned ) ) // Call the Windows API function "EnumProcesses" to get an array of process IDs
+    {
+        int count = bytesReturned / sizeof( DWORD ); // Calculate the number of process IDs in the "processIds" array
+        for ( int x = 0; x < count; x++ ) // Iterate through the process IDs in the "processIds" array
+        {
+            // Call the Windows API function "OpenProcess" to get a handle to a running process
+            HANDLE hProcess = OpenProcess( PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, processIds[x] );
+            if ( hProcess ) // A valid handle is returned
+            {
+                char filename[MAX_PATH]; // Array to store the filename of the running process
+                // Call the Windows API function "GetModuleFileNameExA" to get the filename of the executable module associated with the process
+                DWORD length = GetModuleFileNameExA( hProcess, NULL, filename, MAX_PATH ); 
+                if ( length > 0 ) { processes.push_back( filename ); } // A valid filename is returned
+                CloseHandle( hProcess );
+            }
+        }
+    }
+    return processes; // returns a vector of strings
+}
+
+int main()
+{
+    const int runTime = 24 * 60 * 60; // Maximum runtime in seconds ( 24 hours )
+    const int waitTime = 600; // Time between each loop iteration in seconds ( 10 minutes )
+    int timeElapsed = 0; // Total elapsed time in seconds
+
+    while ( timeElapsed < runTime )
+    {
+        std::vector<std::string> processes = myProgramChecker();
+        bool myExeRunning = false;
+
+        for ( const auto& process : processes ) // Iterate through the vector of running processes
+        {
+            // Check if the filename contains "example.exe"
+            if ( process.find( "example.exe" ) != std::string::npos )
+            {
+                myExeRunning = true; // Set the flag to true if "example.exe" is found
+                break; // Exit the loop if "example.exe" is found
+            }
+        }
+        if ( !myExeRunning )
+        {
+            std::cout << "example.exe is not running.\n";
+            myConnectChecker();
+        }
+        // std::cout << "Running processes:\n";
+        // for ( const auto& process : processes ) { std::cout << process << '\n'; }
+
+        std::this_thread::sleep_for( std::chrono::seconds( waitTime ) ); // Sleep for LOOP_TIME seconds
+        timeElapsed += waitTime; // Update the total elapsed time
+    }
+
+    std::cout << "Simple Program Starter has ENDED\n";
+    std::cin.get(); // Hang program until user presses a key.
+    return 0; // Exit the program
+}
+
+// Run program: Ctrl + F5 or Debug > Start Without Debugging menu
+// Debug program: F5 or Debug > Start Debugging menu
+
+// Tips for Getting Started: 
+//   1. Use the Solution Explorer window to add/manage files
+//   2. Use the Team Explorer window to connect to source control
+//   3. Use the Output window to see build output and other messages
+//   4. Use the Error List window to view errors
+//   5. Go to Project > Add New Item to create new code files, or Project > Add Existing Item to add existing code files to the project
+//   6. In the future, to open this project again, go to File > Open > Project and select the .sln file
